@@ -1,0 +1,98 @@
+@base = http://localhost:7986/api
+
+### 1. Create a trip
+# @name createTrip
+POST {{base}}/trips
+Content-Type: application/json
+
+{
+  "name": "Santa Marta 2026",
+  "participants": ["Ana", "Luis", "Sara"]
+}
+
+###
+# Values captured from the response above (participants come sorted by name)
+@tripId = {{createTrip.response.body.$.id}}
+@ana = {{createTrip.response.body.$.participants[0].id}}
+@luis = {{createTrip.response.body.$.participants[1].id}}
+@sara = {{createTrip.response.body.$.participants[2].id}}
+
+### 2. List trips
+GET {{base}}/trips
+
+### 3. Get trip detail
+GET {{base}}/trips/{{tripId}}
+
+### 4. Add a participant
+POST {{base}}/trips/{{tripId}}/participants
+Content-Type: application/json
+
+{ "name": "Juan" }
+
+### 5. Ana pays the hotel for everyone
+POST {{base}}/trips/{{tripId}}/expenses
+Content-Type: application/json
+
+{
+  "description": "Hotel",
+  "amount": 320000,
+  "date": "2026-10-10",
+  "paidById": {{ana}},
+  "splitAmongIds": [{{ana}}, {{luis}}, {{sara}}]
+}
+
+### 6. Luis pays groceries for everyone
+POST {{base}}/trips/{{tripId}}/expenses
+Content-Type: application/json
+
+{
+  "description": "Groceries",
+  "amount": 85500,
+  "date": "2026-10-11",
+  "paidById": {{luis}},
+  "splitAmongIds": [{{ana}}, {{luis}}, {{sara}}]
+}
+
+### 7. Sara pays a taxi only for herself and Luis (no date = today)
+# @name createTaxi
+POST {{base}}/trips/{{tripId}}/expenses
+Content-Type: application/json
+
+{
+  "description": "Taxi",
+  "amount": 30000,
+  "paidById": {{sara}},
+  "splitAmongIds": [{{luis}}, {{sara}}]
+}
+
+### 8. List expenses
+GET {{base}}/trips/{{tripId}}/expenses
+
+### 9. Balances
+GET {{base}}/trips/{{tripId}}/balances
+
+### 10. Suggested settlements
+GET {{base}}/trips/{{tripId}}/settlements
+
+### 11. Delete the taxi expense
+DELETE {{base}}/trips/{{tripId}}/expenses/{{createTaxi.response.body.$.id}}
+
+### 12. Validation error (400)
+POST {{base}}/trips/{{tripId}}/expenses
+Content-Type: application/json
+
+{
+  "description": "",
+  "amount": -5,
+  "paidById": {{ana}},
+  "splitAmongIds": []
+}
+
+### 13. Trip not found (404)
+GET {{base}}/trips/999999
+
+### 14. Duplicate participant name (400)
+POST {{base}}/trips/{{tripId}}/participants
+Content-Type: application/json
+
+{ "name": "ana" }

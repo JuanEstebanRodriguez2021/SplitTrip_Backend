@@ -12,6 +12,7 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+    
   # Uncomment to send real emails (e.g. Gmail with an app password).
   # While this stays commented, links are printed in the console.
   # mail:

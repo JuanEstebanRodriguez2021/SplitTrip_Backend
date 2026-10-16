@@ -1,20 +1,40 @@
 server:
   port: 7986
 
-
 spring:
   application:
     name: splittrip
   datasource:
     url: jdbc:h2:mem:splittrip
-    username: splitjuanes
-    password: triprod
+    username: sa
+    password:
   jpa:
     hibernate:
-     ddl-auto: create-drop
+      ddl-auto: create-drop
     open-in-view: false
+  # Uncomment to send real emails (e.g. Gmail with an app password).
+  # While this stays commented, links are printed in the console.
+  # mail:
+  #   host: smtp.gmail.com
+  #   port: 587
+  #   username: your-account@gmail.com
+  #   password: ${MAIL_PASSWORD}
+  #   properties:
+  #     mail.smtp.auth: true
+  #     mail.smtp.starttls.enable: true
 
 app:
+  frontend-url: http://localhost:5173
   cors:
-     allowed-origins: http://localhost:5183
-
+    allowed-origins: http://localhost:5173
+  jwt:
+    # Dev-only secret (min 32 characters). In production set the APP_JWT_SECRET env variable.
+    secret: ${APP_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    expiration: 24h
+    remember-me-expiration: 30d
+  verification:
+    expiration: 24h
+  password-reset:
+    expiration: 1h
+  mail:
+    from: no-reply@splittrip.app

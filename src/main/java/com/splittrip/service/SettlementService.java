@@ -3,6 +3,7 @@ package com.splittrip.service;
 import com.splittrip.dto.BalanceResponse;
 import com.splittrip.dto.ParticipantResponse;
 import com.splittrip.dto.SettlementResponse;
+import com.splittrip.model.Expense;
 import com.splittrip.model.Participant;
 import com.splittrip.repository.ExpenseRepository;
 import com.splittrip.repository.ParticipantRepository;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,28 +23,34 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class SettlementService {
 
-    private final TripService tripService;
+    private final TripAccess tripAccess;
     private final ParticipantRepository participants;
     private final ExpenseRepository expenses;
     private final SettlementCalculator calculator;
 
-    public SettlementService(TripService tripService, ParticipantRepository participants,
+    public SettlementService(TripAccess tripAccess, ParticipantRepository participants,
                              ExpenseRepository expenses, SettlementCalculator calculator) {
-        this.tripService = tripService;
+        this.tripAccess = tripAccess;
         this.participants = participants;
         this.expenses = expenses;
         this.calculator = calculator;
     }
 
-    public List<BalanceResponse> getBalances(Long tripId) {
-        TripLedger ledger = loadLedger(tripId);
+    public List<BalanceResponse> getBalances(Long tripId, Long userId) {
+        tripAccess.findOwnedTrip(tripId, userId);
+        Ledger ledger = loadLedger(tripId);
         return ledger.members().values().stream()
-                .map(p -> new BalanceResponse(ParticipantResponse.from(p), ledger.balances().get(p.getId())))
+                .map(p -> {
+                    BigDecimal paid = ledger.paid().get(p.getId());
+                    BigDecimal balance = ledger.balances().get(p.getId());
+                    return new BalanceResponse(ParticipantResponse.from(p), paid, paid.subtract(balance), balance);
+                })
                 .toList();
     }
 
-    public List<SettlementResponse> getSettlements(Long tripId) {
-        TripLedger ledger = loadLedger(tripId);
+    public List<SettlementResponse> getSettlements(Long tripId, Long userId) {
+        tripAccess.findOwnedTrip(tripId, userId);
+        Ledger ledger = loadLedger(tripId);
         return calculator.calculateSettlements(ledger.balances()).stream()
                 .map(t -> new SettlementResponse(
                         ParticipantResponse.from(ledger.members().get(t.fromId())),
@@ -50,22 +59,27 @@ public class SettlementService {
                 .toList();
     }
 
-    private TripLedger loadLedger(Long tripId) {
-        tripService.findTrip(tripId);
-
+    /** Members, amount paid and balance of each participant. Callers must check access first. */
+    Ledger loadLedger(Long tripId) {
         Map<Long, Participant> members = new LinkedHashMap<>();
-        participants.findByTripIdOrderByName(tripId).forEach(p -> members.put(p.getId(), p));
+        Map<Long, BigDecimal> paid = new HashMap<>();
+        for (Participant p : participants.findByTripIdOrderByName(tripId)) {
+            members.put(p.getId(), p);
+            paid.put(p.getId(), BigDecimal.ZERO.setScale(2));
+        }
 
-        List<ExpenseInput> inputs = expenses.findByTripIdOrderByDateDescIdDesc(tripId).stream()
-                .map(e -> new ExpenseInput(
-                        e.getPaidBy().getId(),
-                        e.getAmount(),
-                        e.getSplitAmong().stream().map(Participant::getId).toList()))
-                .toList();
+        List<ExpenseInput> inputs = new ArrayList<>();
+        for (Expense e : expenses.findByTripIdOrderByDateDescIdDesc(tripId)) {
+            paid.merge(e.getPaidBy().getId(), e.getAmount(), BigDecimal::add);
+            inputs.add(new ExpenseInput(
+                    e.getPaidBy().getId(),
+                    e.getAmount(),
+                    e.getSplitAmong().stream().map(Participant::getId).toList()));
+        }
 
-        return new TripLedger(members, calculator.calculateBalances(members.keySet(), inputs));
+        return new Ledger(members, paid, calculator.calculateBalances(members.keySet(), inputs));
     }
 
-    private record TripLedger(Map<Long, Participant> members, Map<Long, BigDecimal> balances) {
+    record Ledger(Map<Long, Participant> members, Map<Long, BigDecimal> paid, Map<Long, BigDecimal> balances) {
     }
 }

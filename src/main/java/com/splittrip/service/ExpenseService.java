@@ -24,26 +24,26 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ExpenseService {
 
-    private final TripService tripService;
+    private final TripAccess tripAccess;
     private final ParticipantRepository participants;
     private final ExpenseRepository expenses;
 
-    public ExpenseService(TripService tripService, ParticipantRepository participants, ExpenseRepository expenses) {
-        this.tripService = tripService;
+    public ExpenseService(TripAccess tripAccess, ParticipantRepository participants, ExpenseRepository expenses) {
+        this.tripAccess = tripAccess;
         this.participants = participants;
         this.expenses = expenses;
     }
 
-    public List<ExpenseResponse> listExpenses(Long tripId) {
-        tripService.findTrip(tripId);
+    public List<ExpenseResponse> listExpenses(Long tripId, Long userId) {
+        tripAccess.findOwnedTrip(tripId, userId);
         return expenses.findByTripIdOrderByDateDescIdDesc(tripId).stream()
                 .map(ExpenseResponse::from)
                 .toList();
     }
 
     @Transactional
-    public ExpenseResponse createExpense(Long tripId, CreateExpenseRequest request) {
-        Trip trip = tripService.findTrip(tripId);
+    public ExpenseResponse createExpense(Long tripId, CreateExpenseRequest request, Long userId) {
+        Trip trip = tripAccess.findOwnedTrip(tripId, userId);
         Map<Long, Participant> members = participants.findByTripIdOrderByName(tripId).stream()
                 .collect(Collectors.toMap(Participant::getId, Function.identity()));
 
@@ -76,7 +76,8 @@ public class ExpenseService {
     }
 
     @Transactional
-    public void deleteExpense(Long tripId, Long expenseId) {
+    public void deleteExpense(Long tripId, Long expenseId, Long userId) {
+        tripAccess.findOwnedTrip(tripId, userId);
         Expense expense = expenses.findByIdAndTripId(expenseId, tripId)
                 .orElseThrow(() -> new NotFoundException("Expense not found: " + expenseId));
         expenses.delete(expense);

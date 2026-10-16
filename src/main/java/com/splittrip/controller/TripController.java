@@ -5,9 +5,12 @@ import com.splittrip.dto.CreateTripRequest;
 import com.splittrip.dto.ParticipantResponse;
 import com.splittrip.dto.TripResponse;
 import com.splittrip.dto.TripSummaryResponse;
+import com.splittrip.security.CurrentUser;
 import com.splittrip.service.TripService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,25 +32,27 @@ public class TripController {
     }
 
     @GetMapping
-    public List<TripSummaryResponse> listTrips() {
-        return tripService.listTrips();
+    public List<TripSummaryResponse> listTrips(@AuthenticationPrincipal Jwt jwt) {
+        return tripService.listTrips(CurrentUser.id(jwt));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TripResponse createTrip(@Valid @RequestBody CreateTripRequest request) {
-        return tripService.createTrip(request);
+    public TripResponse createTrip(@Valid @RequestBody CreateTripRequest request,
+                                   @AuthenticationPrincipal Jwt jwt) {
+        return tripService.createTrip(request, CurrentUser.id(jwt));
     }
 
     @GetMapping("/{tripId}")
-    public TripResponse getTrip(@PathVariable Long tripId) {
-        return tripService.getTrip(tripId);
+    public TripResponse getTrip(@PathVariable Long tripId, @AuthenticationPrincipal Jwt jwt) {
+        return tripService.getTrip(tripId, CurrentUser.id(jwt));
     }
 
     @PostMapping("/{tripId}/participants")
     @ResponseStatus(HttpStatus.CREATED)
     public ParticipantResponse addParticipant(@PathVariable Long tripId,
-                                              @Valid @RequestBody AddParticipantRequest request) {
-        return tripService.addParticipant(tripId, request);
+                                              @Valid @RequestBody AddParticipantRequest request,
+                                              @AuthenticationPrincipal Jwt jwt) {
+        return tripService.addParticipant(tripId, request, CurrentUser.id(jwt));
     }
 }

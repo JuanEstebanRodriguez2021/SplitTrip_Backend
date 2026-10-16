@@ -1,48 +1,105 @@
 @base = http://localhost:7986/api
 
-### 1. Create a trip
+############################################################
+# AUTH
+############################################################
+
+### 1. Register
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Camila",
+  "email": "camila@example.com",
+  "password": "Secreta123!"
+}
+
+### 2. Verify email
+# Copy the token from the console line:
+#   "Verification link for camila@example.com: http://localhost:5173/verify-email?token=XXXX"
+POST {{base}}/auth/verify-email
+Content-Type: application/json
+
+{ "token": "PASTE_VERIFICATION_TOKEN_HERE" }
+
+### 3. Resend verification link (always 200)
+POST {{base}}/auth/resend-verification
+Content-Type: application/json
+
+{ "email": "camila@example.com" }
+
+### 4. Login (rememberMe = true -> token lasts 30 days, false -> 24 hours)
+# @name login
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "camila@example.com",
+  "password": "Secreta123!",
+  "rememberMe": true
+}
+
+###
+@token = {{login.response.body.$.accessToken}}
+
+### 5. Who am I
+GET {{base}}/auth/me
+Authorization: Bearer {{token}}
+
+############################################################
+# TRIPS
+############################################################
+
+### 6. Create a trip (Camila is added automatically)
 # @name createTrip
 POST {{base}}/trips
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "name": "Santa Marta 2026",
-  "participants": ["Ana", "Luis", "Sara"]
+  "category": "TRIP",
+  "participants": ["Luis", "Sara"]
 }
 
 ###
-# Values captured from the response above (participants come sorted by name)
+# Participants come sorted by name: Camila, Luis, Sara
 @tripId = {{createTrip.response.body.$.id}}
-@ana = {{createTrip.response.body.$.participants[0].id}}
+@camila = {{createTrip.response.body.$.participants[0].id}}
 @luis = {{createTrip.response.body.$.participants[1].id}}
 @sara = {{createTrip.response.body.$.participants[2].id}}
 
-### 2. List trips
+### 7. List my trips
 GET {{base}}/trips
+Authorization: Bearer {{token}}
 
-### 3. Get trip detail
-GET {{base}}/trips/{{tripId}}
-
-### 4. Add a participant
+### 8. Add a participant
 POST {{base}}/trips/{{tripId}}/participants
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 { "name": "Juan" }
 
-### 5. Ana pays the hotel for everyone
+############################################################
+# EXPENSES
+############################################################
+
+### 9. Camila pays the hotel for everyone
 POST {{base}}/trips/{{tripId}}/expenses
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "description": "Hotel",
   "amount": 320000,
   "date": "2026-10-10",
-  "paidById": {{ana}},
-  "splitAmongIds": [{{ana}}, {{luis}}, {{sara}}]
+  "paidById": {{camila}},
+  "splitAmongIds": [{{camila}}, {{luis}}, {{sara}}]
 }
 
-### 6. Luis pays groceries for everyone
+### 10. Luis pays groceries for everyone
 POST {{base}}/trips/{{tripId}}/expenses
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -50,12 +107,13 @@ Content-Type: application/json
   "amount": 85500,
   "date": "2026-10-11",
   "paidById": {{luis}},
-  "splitAmongIds": [{{ana}}, {{luis}}, {{sara}}]
+  "splitAmongIds": [{{camila}}, {{luis}}, {{sara}}]
 }
 
-### 7. Sara pays a taxi only for herself and Luis (no date = today)
+### 11. Sara pays a taxi for herself and Luis (no date = today)
 # @name createTaxi
 POST {{base}}/trips/{{tripId}}/expenses
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -65,34 +123,5 @@ Content-Type: application/json
   "splitAmongIds": [{{luis}}, {{sara}}]
 }
 
-### 8. List expenses
-GET {{base}}/trips/{{tripId}}/expenses
-
-### 9. Balances
-GET {{base}}/trips/{{tripId}}/balances
-
-### 10. Suggested settlements
-GET {{base}}/trips/{{tripId}}/settlements
-
-### 11. Delete the taxi expense
-DELETE {{base}}/trips/{{tripId}}/expenses/{{createTaxi.response.body.$.id}}
-
-### 12. Validation error (400)
-POST {{base}}/trips/{{tripId}}/expenses
-Content-Type: application/json
-
-{
-  "description": "",
-  "amount": -5,
-  "paidById": {{ana}},
-  "splitAmongIds": []
-}
-
-### 13. Trip not found (404)
-GET {{base}}/trips/999999
-
-### 14. Duplicate participant name (400)
-POST {{base}}/trips/{{tripId}}/participants
-Content-Type: application/json
-
-{ "name": "ana" }
+### 12. List expenses
+GET
